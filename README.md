@@ -19,9 +19,9 @@ Users simply describe what they ate, and JC estimates calories, protein, carbohy
 ## Screenshots
 
 <p align="center">
-  <img src="screenshots/home.png" width="250">
-  <img src="screenshots/logging.png" width="250">
-  <img src="screenshots/history.png" width="250">
+  <img src="screenshots/home.jpg" width="250">
+  <img src="screenshots/logging.jpg" width="250">
+  <img src="screenshots/history.jpg" width="250">
 </p>
 
 ## Download
