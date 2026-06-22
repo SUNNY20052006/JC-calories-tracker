@@ -47,8 +47,8 @@ Download the latest Android APK from the Releases section.
 ## Installation
 
 ```bash
-git clone https://github.com/yourusername/jc.git
-cd jc
+git clone https://github.com/SUNNY20052006/JC-calories-tracker.git
+cd JC-calories-tracker.git
 npm install
 npx expo start
 ```
