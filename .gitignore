@@ -34,6 +34,10 @@ yarn-error.*
 .env
 .env*.local
 
+# IDE / personal config
+/.claude
+/.idea
+
 # typescript
 *.tsbuildinfo
 
