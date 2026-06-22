@@ -1,0 +1,160 @@
+import { PortionRule } from '../types';
+
+export const PORTION_DATABASE: PortionRule[] = [
+  {
+    unit: 'piece',
+    variants: ['pieces', 'pc', 'pcs', 'no.', 'nos', 'number'],
+    defaultGrams: 100,
+    foodOverrides: {
+      chicken: 55,
+      egg: 55,
+      fish: 100,
+      fish_fry: 100,
+      samosa: 60,
+      pakora: 30,
+      luchi: 35,
+      roti: 40,
+      chapati: 40,
+      bread: 30,
+      toast: 30,
+      burger: 180,
+      banana: 118,
+      apple: 182,
+      potato: 150,
+      paneer: 80,
+      mutton: 100,
+    },
+  },
+  {
+    unit: 'slice',
+    variants: ['slices'],
+    defaultGrams: 30,
+    foodOverrides: {
+      bread: 30,
+      pizza: 100,
+      cake: 80,
+      watermelon: 300,
+    },
+  },
+  {
+    unit: 'bowl',
+    variants: ['bowls', 'katori', 'katoris'],
+    defaultGrams: 180,
+    foodOverrides: {
+      rice: 150,
+      dal: 180,
+      curry: 200,
+      soup: 240,
+      salad: 120,
+      cereal: 60,
+      biryani: 300,
+      pulao: 200,
+    },
+  },
+  {
+    unit: 'cup',
+    variants: ['cups'],
+    defaultGrams: 240,
+    foodOverrides: {
+      rice: 150,
+      flour: 120,
+      milk: 240,
+      dal: 180,
+      oats: 80,
+      tea: 200,
+      coffee: 200,
+    },
+  },
+  {
+    unit: 'plate',
+    variants: ['plates', 'thali'],
+    defaultGrams: 300,
+    foodOverrides: {
+      biryani: 350,
+      rice: 250,
+      pasta: 250,
+      noodles: 250,
+    },
+  },
+  {
+    unit: 'serving',
+    variants: ['servings', 'portion', 'portions', 'helping', 'helpings'],
+    defaultGrams: 150,
+    foodOverrides: {
+      pasta: 180,
+      rice: 150,
+      chicken: 120,
+      paneer: 80,
+    },
+  },
+  {
+    unit: 'glass',
+    variants: ['glasses'],
+    defaultGrams: 240,
+    foodOverrides: {
+      milk: 240,
+      juice: 240,
+      coke: 350,
+      water: 240,
+      lassi: 300,
+    },
+  },
+  {
+    unit: 'tablespoon',
+    variants: ['tablespoons', 'tbsp', 'tbs'],
+    defaultGrams: 15,
+    foodOverrides: {
+      oil: 14,
+      butter: 14,
+      sugar: 12,
+      honey: 21,
+    },
+  },
+  {
+    unit: 'teaspoon',
+    variants: ['teaspoons', 'tsp'],
+    defaultGrams: 5,
+    foodOverrides: {
+      oil: 4,
+      sugar: 4,
+      salt: 6,
+    },
+  },
+  {
+    unit: 'spoon',
+    variants: ['spoons', 'ladle', 'ladles', 'scoop', 'scoops'],
+    defaultGrams: 15,
+    foodOverrides: {
+      rice: 40,
+      dal: 45,
+      curry: 50,
+    },
+  },
+  {
+    unit: 'roti',
+    variants: ['rotis', 'chapati', 'chapatis', 'chapatti', 'phulka', 'phulkas'],
+    defaultGrams: 40,
+    foodOverrides: {},
+  },
+  {
+    unit: 'egg',
+    variants: ['eggs'],
+    defaultGrams: 55,
+    foodOverrides: {},
+  },
+  {
+    unit: 'banana',
+    variants: ['bananas'],
+    defaultGrams: 118,
+    foodOverrides: {},
+  },
+  {
+    unit: 'apple',
+    variants: ['apples'],
+    defaultGrams: 182,
+    foodOverrides: {},
+  },
+];
+
+export const OIL_CALORIES_PER_PERCENT = 0.14 * 8.84;
+export const OIL_FAT_PER_PERCENT = 0.14;

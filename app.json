@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "JC",
+    "slug": "JC",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "jc",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.jc.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.jc.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-font",
+      "expo-system-ui"
+    ],
+    "androidStatusBar": {
+      "translucent": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9de2bcfb-1ac9-4f1a-a0d8-46dcc11ef1bd"
+      }
+    },
+    "owner": "testersunny2006"
+  }
+}
