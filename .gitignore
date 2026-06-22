@@ -37,6 +37,8 @@ yarn-error.*
 # IDE / personal config
 /.claude
 /.idea
+/AGENTS.md
+/CLAUDE.md
 
 # typescript
 *.tsbuildinfo
