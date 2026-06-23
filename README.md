@@ -26,7 +26,7 @@ Users simply describe what they ate, and JC estimates calories, protein, carbohy
 
 ## Download
 
-Download the latest Android APK from the Releases section.
+📱 [Download Latest APK](https://github.com/SUNNY20052006/JC-calories-tracker/releases/latest/)
 
 ## Example Inputs
 
