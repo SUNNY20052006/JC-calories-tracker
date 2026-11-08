@@ -1,9 +1,16 @@
 {
   "cli": {
-    "version": ">= 3.0.0"
+    "version": ">= 3.0.0",
+    "appVersionSource": "local"
   },
   "build": {
     "preview": {
+      "distribution": "internal",
+      "environment": "preview",
+      "env": {
+        "EXPO_NO_DOTENV": "1",
+        "EXPO_NO_CLIENT_ENV_VARS": "1"
+      },
       "android": {
         "buildType": "apk"
       }

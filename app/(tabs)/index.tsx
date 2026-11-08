@@ -1,4 +1,9 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
+import { Button, Text, TextInput } from 'react-native-paper';
+import { useRouter } from 'expo-router';
+import { useMealDraft } from '../../hooks/useMealDraft';
+import { useTextMealAnalysis } from '../../hooks/useTextMealAnalysis';
+import { combineMeal, mealDescription, nutritionForServings, parseServings } from '../../utils/recipes';
 import {
   View,
   StyleSheet,
@@ -8,8 +13,9 @@ import {
   Alert,
   Animated,
   Easing,
+  Keyboard,
+  Pressable,
 } from 'react-native';
-import { Text } from 'react-native-paper';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from 'expo-router';
 import DailyProgress from '../../components/DailyProgress';
@@ -17,28 +23,33 @@ import FoodEntry from '../../components/FoodEntry';
 import OilSlider from '../../components/OilSlider';
 import AnalysisResultCard from '../../components/AnalysisResultCard';
 import SwipeableTabScreen from '../../components/SwipeableTabScreen';
-import { useUserSettings } from '../../hooks/useSettings';
-import { analyzeFoodWithGemini } from '../../services/GeminiFoodAnalysisService';
-import { analyzeFoodLocally } from '../../services/LocalFoodAnalysisService';
+import { useActiveProfileId, useUserSettings } from '../../hooks/useSettings';
+import { rememberTextMeal } from '../../services/TextMealAnalysisService';
 import { getTodayTotals, insertFoodLog } from '../../database/DatabaseService';
 import { getTodayDateString } from '../../utils/nutrition';
 import { FoodAnalysisResult, FoodItem } from '../../types';
-import { BG_BASE, COLOR_PRIMARY, TEXT_SECONDARY, MACRO_CALORIES, TEXT_DISABLED, TEXT_PRIMARY, COLOR_SUCCESS } from '../../constants/colors';
+import { BG_BASE, BG_SURFACE, COLOR_BORDER, TEXT_SECONDARY, COLOR_SUCCESS } from '../../constants/colors';
 import { SCREEN_PADDING_H, BUTTON_GAP, SPACE_5, SPACE_8 } from '../../constants/spacing';
 import { LinearGradient } from 'expo-linear-gradient';
 import GlassActionButton from '../../components/GlassActionButton';
+import { mealNutritionToDraft, readMealNutrition, updateTargetDraft, type TargetDraft, type TargetField } from '../../utils/nutritionTargets';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function HomeScreen() {
   const db = useSQLiteContext();
-  const { settings, reload: reloadSettings } = useUserSettings();
+  const router = useRouter();
+  const { selections, changeServings, removeRecipe, clearRecipes } = useMealDraft();
+  const { settings } = useUserSettings();
+  const profileId = useActiveProfileId();
 
   const [foodText, setFoodText] = useState('');
   const [oilPercentage, setOilPercentage] = useState(100);
-  const [analysisResult, setAnalysisResult] = useState<FoodAnalysisResult | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
+  const { analysis, setAnalysis, analyzing, analyze, invalidate } = useTextMealAnalysis(db, profileId);
+  const analysisResult = analysis?.result ?? null;
   const [saving, setSaving] = useState(false);
-  const [usedLocalFallback, setUsedLocalFallback] = useState(false);
   const [savedVisible, setSavedVisible] = useState(false);
+  const [manualTotal, setManualTotal] = useState<{ base: FoodAnalysisResult; draft: TargetDraft } | null>(null);
+  const [servingEdit, setServingEdit] = useState<{ id: number; value: string } | null>(null);
 
   const scrollRef = useRef<ScrollView>(null);
   const saveOpacity = useRef(new Animated.Value(0)).current;
@@ -49,59 +60,67 @@ export default function HomeScreen() {
     carbs: 0,
     fat: 0,
   });
+  const mealResult = useMemo(() => combineMeal(analysisResult, selections), [analysisResult, selections]);
+  const macroDraft = manualTotal?.base === mealResult ? manualTotal.draft : null;
+  const savedNutrition = mealResult && readMealNutrition(macroDraft, mealResult).nutrition;
+  const readyToSave = !!savedNutrition && (!foodText.trim() || !!analysisResult) && !analyzing;
+
+  function changeFoodText(value: string) {
+    setFoodText(value);
+    invalidate();
+  }
+  function changeOil(value: number) {
+    setOilPercentage(value);
+    invalidate();
+  }
 
   function handleFocusInput() {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150);
   }
 
   const loadTotals = useCallback(async () => {
-    const totals = await getTodayTotals(db, getTodayDateString());
+    const totals = await getTodayTotals(db, getTodayDateString(), profileId);
     setDailyTotals(totals);
-  }, [db]);
+  }, [db, profileId]);
 
   useFocusEffect(
     useCallback(() => {
       loadTotals();
-      reloadSettings();
-    }, [loadTotals, reloadSettings])
+    }, [loadTotals])
   );
 
-  async function handleAnalyze() {
-    if (!foodText.trim()) {
-      Alert.alert('Error', 'Please describe what you ate.');
-      return;
-    }
-    setAnalyzing(true);
-    setAnalysisResult(null);
-    setUsedLocalFallback(false);
-    try {
-      const geminiResult = await analyzeFoodWithGemini(foodText, oilPercentage);
-      setAnalysisResult(geminiResult);
-    } catch {
-      const localResult = analyzeFoodLocally(foodText, oilPercentage);
-      setAnalysisResult(localResult);
-      setUsedLocalFallback(true);
-    } finally {
-      setAnalyzing(false);
-    }
+  function handleAnalyze(forceGemini = false) {
+    if (saving) return;
+    Keyboard.dismiss();
+    void analyze(foodText, oilPercentage, forceGemini);
   }
 
   async function handleSave() {
-    if (!analysisResult) return;
+    if (!readyToSave || !savedNutrition || saving) return;
+    if ([savedNutrition.calories, savedNutrition.protein, savedNutrition.carbs, savedNutrition.fat].some(v => !Number.isFinite(v) || v < 0)) {
+      Alert.alert('Invalid nutrition', 'Nutrition totals must be valid non-negative numbers.'); return;
+    }
     setSaving(true);
     try {
       await insertFoodLog(db, {
-        foodText,
+        foodText: mealDescription(foodText, selections),
         oilPercentage,
-        calories: analysisResult.calories,
-        protein: analysisResult.protein,
-        carbs: analysisResult.carbs,
-        fat: analysisResult.fat,
+        calories: savedNutrition.calories,
+        protein: savedNutrition.protein,
+        carbs: savedNutrition.carbs,
+        fat: savedNutrition.fat,
         createdAt: new Date().toISOString(),
-      });
+      }, profileId);
+      const textEstimate = analysis && selections.length === 0 && macroDraft
+        ? { ...analysis, result: { ...analysis.result, ...savedNutrition } }
+        : analysis;
+      await rememberTextMeal(db, foodText, oilPercentage, textEstimate, profileId);
       setFoodText('');
       setOilPercentage(100);
-      setAnalysisResult(null);
+      invalidate();
+      clearRecipes();
+      setManualTotal(null);
+      setServingEdit(null);
       await loadTotals();
       setSaving(false);
       showSaveConfirmation();
@@ -129,22 +148,37 @@ export default function HomeScreen() {
     }, 1200);
   }
 
-  function handleEditTotal(field: string, value: number) {
-    if (!analysisResult) return;
-    setAnalysisResult({ ...analysisResult, [field]: value });
+  function handleEditTotal(field: TargetField, value: string) {
+    if (!mealResult || analyzing || saving) return;
+    setManualTotal(current => ({ base: mealResult,
+      draft: updateTargetDraft(current?.base === mealResult ? current.draft : mealNutritionToDraft(mealResult), field, value),
+    }));
+  }
+
+  function applyServingEdit() {
+    if (!servingEdit) return;
+    const amount = parseServings(servingEdit.value);
+    if (amount === null) {
+      Alert.alert('Invalid serving amount', 'Enter a serving amount greater than zero.');
+      return;
+    }
+    changeServings(servingEdit.id, amount);
+    setServingEdit(null);
+    Keyboard.dismiss();
   }
 
   function handleEditItem(index: number, updatedItem: FoodItem) {
-    if (!analysisResult) return;
+    if (!analysis || analyzing || saving) return;
+    const analysisResult = analysis.result;
     const foodItems = [...analysisResult.foodItems];
     foodItems[index] = updatedItem;
-    setAnalysisResult({
+    setAnalysis({ ...analysis, result: {
       foodItems,
       calories: foodItems.reduce((s, f) => s + f.calories, 0),
       protein: foodItems.reduce((s, f) => s + f.protein, 0),
       carbs: foodItems.reduce((s, f) => s + f.carbs, 0),
       fat: foodItems.reduce((s, f) => s + f.fat, 0),
-    });
+    } });
   }
 
   return (
@@ -173,16 +207,17 @@ export default function HomeScreen() {
             />
           )}
 
-          <FoodEntry value={foodText} onChangeText={setFoodText} />
-          <OilSlider value={oilPercentage} onValueChange={setOilPercentage} />
+          <FoodEntry value={foodText} onChangeText={changeFoodText} disabled={saving} />
+          <Button onPress={() => router.navigate('/(tabs)/recipes')} disabled={saving || analyzing}>Add saved recipe</Button>
+          <OilSlider value={oilPercentage} onValueChange={changeOil} disabled={saving} />
 
           <View style={styles.buttonRow}>
             <View style={styles.buttonGroup}>
               <GlassActionButton
                 kind="primary"
-                onPress={handleAnalyze}
+                onPress={() => handleAnalyze()}
                 loading={analyzing}
-                disabled={analyzing || !foodText.trim()}
+                disabled={analyzing || saving || !foodText.trim()}
               >
                 {analyzing ? 'Analyzing...' : 'Analyze'}
               </GlassActionButton>
@@ -204,7 +239,7 @@ export default function HomeScreen() {
                   kind="secondary"
                   onPress={handleSave}
                   loading={saving}
-                  disabled={saving || !analysisResult}
+                  disabled={saving || !readyToSave}
                 >
                   {saving ? 'Saving...' : 'Save Entry'}
                 </GlassActionButton>
@@ -212,14 +247,46 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {analysisResult && (
+          {mealResult && (
             <AnalysisResultCard
               result={analysisResult}
+              total={mealResult}
+              draft={macroDraft}
+              targets={settings}
               onEditTotal={handleEditTotal}
               onEditItem={handleEditItem}
-              onFocusInput={handleFocusInput}
-              usedLocalFallback={usedLocalFallback}
-            />
+              source={analysis?.source}
+              onRefresh={() => handleAnalyze(true)}
+              refreshDisabled={analyzing || saving}
+            >
+              {selections.length > 0 && <Text variant="titleMedium">Saved recipes</Text>}
+              {selections.map(({ recipe, servings }) => {
+                const active = servingEdit?.id === recipe.id;
+                const { calories } = nutritionForServings(recipe, servings);
+                return (
+                  <View key={recipe.id} style={styles.recipeCard}>
+                    <Pressable style={styles.recipeHeader} accessibilityRole="button" accessibilityState={{ expanded: active }}
+                      disabled={saving || analyzing} onPress={() => setServingEdit(active ? null : { id: recipe.id, value: String(servings) })}>
+                      <View style={styles.recipeTitle}>
+                        <Text variant="titleSmall">{recipe.name}</Text>
+                        <Text variant="bodySmall" style={styles.muted}>{servings} {servings === 1 ? 'serving' : 'servings'} · {Math.round(calories)} kcal</Text>
+                      </View>
+                      <Ionicons name={active ? 'chevron-up' : 'chevron-down'} size={18} color={TEXT_SECONDARY} />
+                    </Pressable>
+                    {active && <>
+                      <TextInput mode="outlined" label="Servings to eat" keyboardType="decimal-pad"
+                        value={servingEdit.value} onChangeText={value => setServingEdit({ id: recipe.id, value })}
+                        onFocus={handleFocusInput} onSubmitEditing={applyServingEdit} editable={!saving && !analyzing} />
+                      <View style={styles.recipeActions}>
+                        <Button disabled={saving || analyzing} onPress={() => { removeRecipe(recipe.id); setServingEdit(null); }}>Remove</Button>
+                        <Button mode="contained-tonal" disabled={saving || analyzing} onPress={applyServingEdit}>Apply servings</Button>
+                      </View>
+                    </>}
+                  </View>
+                );
+              })}
+              {selections.length > 0 && !!foodText.trim() && !analysisResult && <Text>Analyze your additional food before saving this meal.</Text>}
+            </AnalysisResultCard>
           )}
 
 
@@ -232,6 +299,11 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: BG_BASE },
   content: { paddingBottom: 96, paddingTop: SPACE_8 },
+  recipeCard: { borderRadius: 14, borderWidth: 1, borderColor: COLOR_BORDER, backgroundColor: BG_SURFACE, padding: 12, gap: 8 },
+  recipeHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  recipeTitle: { flex: 1, gap: 3 },
+  recipeActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 6 },
+  muted: { color: TEXT_SECONDARY },
   buttonRow: {
     paddingHorizontal: SCREEN_PADDING_H,
     paddingTop: SPACE_5,

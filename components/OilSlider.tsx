@@ -9,6 +9,7 @@ import { CAPTION_SMALL } from '../constants/typography';
 interface Props {
   value: number;
   onValueChange: (value: number) => void;
+  disabled?: boolean;
 }
 
 const OIL_LABELS = ['No oil', 'Light', 'Normal', 'Oily', 'V.oily'];
@@ -21,7 +22,7 @@ function getOilLabel(val: number): string {
   return OIL_LABELS[4];
 }
 
-export default function OilSlider({ value, onValueChange }: Props) {
+export default function OilSlider({ value, onValueChange, disabled = false }: Props) {
   return (
     <View style={styles.outContainer}>
       <View style={styles.depthShadow}>
@@ -41,6 +42,7 @@ export default function OilSlider({ value, onValueChange }: Props) {
               step={5}
               value={value}
               onValueChange={onValueChange}
+              disabled={disabled}
               minimumTrackTintColor={MACRO_CALORIES}
               maximumTrackTintColor="rgba(255,255,255,0.12)"
               thumbTintColor={MACRO_CALORIES}

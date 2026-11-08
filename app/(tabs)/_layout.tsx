@@ -11,6 +11,7 @@ export default function TabLayout() {
     >
       <Tabs.Screen name="index" />
       <Tabs.Screen name="entries" />
+      <Tabs.Screen name="recipes" />
       <Tabs.Screen name="settings" />
     </Tabs>
   );

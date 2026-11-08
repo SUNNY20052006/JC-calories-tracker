@@ -1,9 +1,54 @@
 import { FoodAnalysisResult } from '../types';
+import type { SQLiteDatabase } from 'expo-sqlite';
+import { getGeminiQuotaDay, recordAnalysisUsage, type GeminiScope } from '../database/AnalysisUsage';
+import { getPersonalApiKey } from './ApiKeyService';
 
-const RAW_KEYS = process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
+// Native release builds use keys entered on the device. Node runs the offline benchmarks.
+const RAW_KEYS = typeof __DEV__ !== 'undefined' && !__DEV__ ? '' : process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
 const API_KEYS = RAW_KEYS.split(',').map((k: string) => k.trim()).filter(Boolean);
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
+export const GEMINI_MODEL = 'gemini-2.5-flash-lite';
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+export const HAS_DEFAULT_GEMINI_KEYS = API_KEYS.length > 0;
 let nextKeyIndex = 0;
+const reportedDailyQuota = new Map<number, { key: string; day: string }>();
+
+export function forgetProfileQuota(profileId: number): void {
+  reportedDailyQuota.delete(profileId);
+}
+
+export async function hasReportedDailyQuotaReached(scope: GeminiScope, at = new Date(), profileId = 1): Promise<boolean> {
+  const quotaOwner = scope === 'personal' ? profileId : 0;
+  const notice = reportedDailyQuota.get(quotaOwner);
+  if (!notice || notice.day !== getGeminiQuotaDay(at)) return false;
+  const key = scope === 'personal' ? await getPersonalApiKey(profileId) : API_KEYS[0];
+  return key === notice.key && reportedDailyQuota.get(quotaOwner) === notice;
+}
+
+async function isDailyRequestQuotaError(response: Response): Promise<boolean> {
+  try {
+    const body: unknown = await response.json();
+    const details = (body as { error?: { details?: unknown[] } } | null)?.error?.details;
+    if (!Array.isArray(details)) return false;
+
+    return details.some(value => {
+      const detail = value as { '@type'?: unknown; violations?: unknown } | null;
+      if (detail?.['@type'] !== 'type.googleapis.com/google.rpc.QuotaFailure' || !Array.isArray(detail.violations)) return false;
+
+      return detail.violations.some((violation: {
+        quotaId?: unknown;
+        quotaDimensions?: { model?: unknown };
+      } | null) => {
+        const id = violation?.quotaId;
+        const model = violation?.quotaDimensions?.model;
+        return typeof id === 'string' &&
+          /^GenerateRequestsPerDayPerProjectPerModel(?:-|$)/.test(id) &&
+          (model === undefined || model === GEMINI_MODEL);
+      });
+    });
+  } catch {
+    return false;
+  }
+}
 
 function buildPrompt(foodText: string, oilPercentage: number): string {
   return `Analyze the following food description and estimate nutritional values.
@@ -61,25 +106,36 @@ RULES:
 }
 
 export async function analyzeFoodWithGemini(
+  db: SQLiteDatabase,
   foodText: string,
-  oilPercentage: number
+  oilPercentage: number,
+  wholeRecipe: boolean = false,
+  profileId = 1
 ): Promise<FoodAnalysisResult> {
-  if (API_KEYS.length === 0) {
+  const personalKey = await getPersonalApiKey(profileId);
+  const keys = personalKey ? [personalKey] : API_KEYS;
+  const scope = personalKey ? 'personal' : 'default';
+  const quotaOwner = personalKey ? profileId : 0;
+  const startIndex = personalKey ? 0 : nextKeyIndex;
+  if (keys.length === 0) {
     throw new Error('Gemini API key not configured');
   }
 
-  console.warn(`[Gemini] ${API_KEYS.length} keys loaded, starting at index ${nextKeyIndex}`);
-
-  const prompt = buildPrompt(foodText, oilPercentage);
+  const prompt = buildPrompt(foodText, oilPercentage) + (wholeRecipe ? `
+This is a WHOLE RECIPE, not a single serving. Return totals for ALL listed ingredients in the entire batch.
+Keep ingredients associated with their recipe; "and" and "with" may join ingredients, not separate dishes.
+Use specified ingredient amounts and specified oil exactly. Do not add oil twice.
+Do not infer ingredients from gravy colour (orange-coloured gravy does not imply orange fruit).
+If amounts are missing use reasonable assumptions; the user will review these estimates.` : '');
   let lastError: Error | null = null;
 
-  for (let attempt = 0; attempt < API_KEYS.length; attempt++) {
-    const keyIndex = (nextKeyIndex + attempt) % API_KEYS.length;
-    const key = API_KEYS[keyIndex];
-    const masked = key.slice(0, 8) + '...';
+  for (let attempt = 0; attempt < keys.length; attempt++) {
+    const keyIndex = (startIndex + attempt) % keys.length;
+    const key = keys[keyIndex];
 
-    console.warn(`[Gemini] Trying key index ${keyIndex} (${masked})`);
-
+    // Count each dispatched attempt, including retry keys. Usage bookkeeping must not block analysis.
+    const dispatchedAt = new Date();
+    await recordAnalysisUsage(db, scope, dispatchedAt, profileId).catch(() => {});
     const response = await fetch(GEMINI_API_URL, {
       method: 'POST',
       headers: {
@@ -101,8 +157,8 @@ export async function analyzeFoodWithGemini(
     });
 
     if (response.ok) {
-      console.warn(`[Gemini] Key ${keyIndex} succeeded, next start will be ${(keyIndex + 1) % API_KEYS.length}`);
-      nextKeyIndex = (keyIndex + 1) % API_KEYS.length;
+      if (reportedDailyQuota.get(quotaOwner)?.key === key) reportedDailyQuota.delete(quotaOwner);
+      if (!personalKey) nextKeyIndex = (keyIndex + 1) % keys.length;
       const data = await response.json();
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
@@ -151,12 +207,15 @@ export async function analyzeFoodWithGemini(
       };
     }
 
-    const errorText = await response.text();
-    console.warn(`[Gemini] Key ${keyIndex} failed: ${response.status} — ${errorText.slice(0, 120)}`);
-    lastError = new Error(`Gemini API error (${response.status}): ${errorText}`);
+    // One rejected key says nothing about the remaining projects in a multi-key pool.
+    if (keys.length === 1 && response.status === 429 && await isDailyRequestQuotaError(response)) {
+      reportedDailyQuota.set(quotaOwner, { key, day: getGeminiQuotaDay(dispatchedAt) });
+      lastError = new Error('Gemini reported that the daily request quota is exhausted.');
+    } else {
+      lastError = new Error(`Gemini API error (${response.status}). Check your key and quota in Settings.`);
+    }
     continue;
   }
 
-  console.warn(`[Gemini] All ${API_KEYS.length} keys exhausted`);
   throw lastError || new Error('All Gemini API keys exhausted');
 }

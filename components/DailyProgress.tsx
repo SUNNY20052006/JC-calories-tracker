@@ -1,13 +1,11 @@
-import { View, StyleSheet, Animated, Easing } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
-import Svg, { Circle } from 'react-native-svg';
-import { useEffect, useRef } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MACRO_CALORIES, MACRO_PROTEIN, MACRO_CARBS, MACRO_FAT, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_DISABLED } from '../constants/colors';
 import { RADIUS_XL } from '../constants/radius';
 import { RING_VALUE, RING_LABEL } from '../constants/typography';
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+import ProgressDial from './ProgressDial';
 
 interface Props {
   currentCalories: number;
@@ -67,58 +65,12 @@ function Ring({ current, target, label, color, unit, radius, strokeWidth }: {
   strokeWidth: number;
 }) {
   const progress = target > 0 ? Math.min(current / target, 1) : 0;
-  const prevProgress = useRef(0);
-  const animatedProgress = useRef(new Animated.Value(prevProgress.current)).current;
-
-  useEffect(() => {
-    Animated.timing(animatedProgress, {
-      toValue: progress,
-      duration: 500,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-    prevProgress.current = progress;
-  }, [progress]);
-
-  const circumference = 2 * Math.PI * radius;
-  const size = (radius + strokeWidth) * 2 + 4;
-  const center = size / 2;
-
-  const animatedStrokeDashoffset = animatedProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [circumference, 0],
-  });
-
   const remaining = Math.max(0, target - current);
   const isOver = current >= target;
 
   return (
     <View style={styles.ringContainer}>
-      <View style={[styles.ringSvg, { width: size, height: size }]}>
-        <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-          <Circle
-            cx={center}
-            cy={center}
-            r={radius}
-            stroke={color + '20'}
-            strokeWidth={strokeWidth}
-            fill="none"
-          />
-          <AnimatedCircle
-            cx={center}
-            cy={center}
-            r={radius}
-            stroke={color}
-            strokeWidth={strokeWidth}
-            fill="none"
-            strokeDasharray={circumference}
-            strokeDashoffset={animatedStrokeDashoffset}
-            strokeLinecap="round"
-            rotation="-90"
-            origin={`${center}, ${center}`}
-          />
-        </Svg>
-      </View>
+      <ProgressDial progress={progress} color={color} radius={radius} strokeWidth={strokeWidth} />
       <Text style={[styles.ringValue, { color }]}>
         {Math.round(current)}
         <Text style={[styles.ringUnit, { color }]}>{unit}</Text>
@@ -225,10 +177,6 @@ const styles = StyleSheet.create({
   ringContainer: {
     alignItems: 'center',
     width: 76,
-  },
-  ringSvg: {
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   ringValue: {
     ...RING_VALUE,

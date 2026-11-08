@@ -5,10 +5,11 @@ import { runOnJS } from 'react-native-reanimated';
 import { useRouter, usePathname } from 'expo-router';
 import { BG_BASE } from '../constants/colors';
 
-const TAB_ROUTES = ['/(tabs)/index', '/(tabs)/entries', '/(tabs)/settings'] as const;
+const TAB_ROUTES = ['/(tabs)', '/(tabs)/entries', '/(tabs)/recipes', '/(tabs)/settings'] as const;
 type TabRoute = typeof TAB_ROUTES[number];
 
 function normalisePath(pathname: string): TabRoute | null {
+  if (pathname === '/' || pathname === '/index' || pathname === '/(tabs)/index' || pathname === '/(tabs)') return '/(tabs)';
   for (const route of TAB_ROUTES) {
     const bare = route.replace('/(tabs)', '');
     const slug = route.replace('/(tabs)/', '');

@@ -46,8 +46,7 @@ export function formatDate(dateString: string): string {
   });
 }
 
-export function getTodayDateString(): string {
-  const now = new Date();
+export function getTodayDateString(now = new Date()): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 

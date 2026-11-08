@@ -1,0 +1,35 @@
+# Upload only files needed to generate and compile the app.
+/*
+!/.easignore
+!/app.json
+!/eas.json
+!/package.json
+!/package-lock.json
+!/tsconfig.json
+!/app
+!/assets
+!/components
+!/constants
+!/database
+!/hooks
+!/services
+!/types
+!/utils
+
+# Keep local settings, signing materials, and data out even inside source folders.
+.env*
+.expo/
+.npmrc
+credentials.json
+google-services.json
+GoogleService-Info.plist
+*.jks
+*.keystore
+*.key
+*.pem
+*.p8
+*.p12
+*.mobileprovision
+*.db
+*.db-*
+*.sqlite*

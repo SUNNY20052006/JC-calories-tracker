@@ -9,12 +9,14 @@ import { RADIUS_XL } from '../constants/radius';
 const TAB_ICONS: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }> = {
   index: { active: 'home', inactive: 'home-outline' },
   entries: { active: 'list-sharp', inactive: 'list-outline' },
+  recipes: { active: 'book', inactive: 'book-outline' },
   settings: { active: 'settings', inactive: 'settings-outline' },
 };
 
 const TAB_LABELS: Record<string, string> = {
   index: 'Home',
   entries: 'Entries',
+  recipes: 'Recipes',
   settings: 'Settings',
 };
 
@@ -25,8 +27,8 @@ const ACTIVE_COLOR = '#0A84FF';
 
 export default function TabBarIsland(props: any) {
   const { state, navigation, insets } = props;
-  const entranceOpacity = useRef(new Animated.Value(0)).current;
-  const entranceTranslateY = useRef(new Animated.Value(40)).current;
+  const entranceOpacity = useRef(new Animated.Value(hasAnimatedEntrance ? 1 : 0)).current;
+  const entranceTranslateY = useRef(new Animated.Value(hasAnimatedEntrance ? 0 : 40)).current;
 
   useEffect(() => {
     if (!hasAnimatedEntrance) {
@@ -45,7 +47,6 @@ export default function TabBarIsland(props: any) {
       <View style={styles.blueOuterGlow} />
       <Animated.View style={styles.depthShadow}>
         <BlurView intensity={80} tint="dark" style={styles.island}>
-          <View style={styles.baseGlass} />
           <View style={styles.subtleTint} />
           <View style={styles.outerHighlight} />
           <View style={styles.innerShadow} />
@@ -102,20 +103,19 @@ function TabItem({ label, iconActive, iconInactive, isActive, onPress }: {
   }, [handlePressOut, onPress]);
 
   return (
-    <Pressable onPress={handlePress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.tabItem}>
-      <View style={styles.tabContent}>
-        {isActive && <View style={styles.activeGlow} />}
-        <Animated.View style={{ transform: [{ scale }] }}>
-          <Ionicons
-            name={isActive ? iconActive : iconInactive}
-            size={22}
-            color={isActive ? ACTIVE_COLOR : INACTIVE_COLOR}
-          />
-          <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
-            {label}
-          </Text>
-        </Animated.View>
-      </View>
+    <Pressable onPress={handlePress} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.tabItem}
+      accessibilityRole="tab" accessibilityLabel={label} accessibilityState={{ selected: isActive }}>
+      <Animated.View style={[styles.tabForeground, { transform: [{ scale }] }]}>
+        <Ionicons
+          name={isActive ? iconActive : iconInactive}
+          size={22}
+          color={isActive ? ACTIVE_COLOR : INACTIVE_COLOR}
+          style={styles.tabIcon}
+        />
+        <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+          {label}
+        </Text>
+      </Animated.View>
     </Pressable>
   );
 }
@@ -153,15 +153,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: RADIUS_XL,
     overflow: 'hidden',
-    backgroundColor: 'rgba(0,0,0,0.28)',
-  },
-  baseGlass: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.28)',
+    backgroundColor: 'rgba(16,19,24,0.93)',
   },
   subtleTint: {
     position: 'absolute',
@@ -197,39 +189,31 @@ const styles = StyleSheet.create({
   islandInner: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
+    paddingHorizontal: 4,
   },
   tabItem: {
     flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  tabForeground: {
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 76,
+    gap: 3,
   },
-  tabContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 16,
-  },
-  activeGlow: {
-    position: 'absolute',
-    top: 4,
-    left: 6,
-    right: 6,
-    bottom: 4,
-    borderRadius: 12,
-    backgroundColor: 'rgba(10,132,255,0.06)',
-    shadowColor: '#0A84FF',
-    shadowOpacity: 0.16,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 0 },
+  tabIcon: {
+    width: 26,
+    lineHeight: 25,
+    textAlign: 'center',
+    includeFontPadding: false,
   },
   tabLabel: {
     fontSize: 11,
     color: INACTIVE_COLOR,
     fontWeight: '500',
-    marginTop: 2,
+    textAlign: 'center',
+    includeFontPadding: false,
     fontFamily: 'StackSansNotch_500Medium',
   },
   tabLabelActive: {

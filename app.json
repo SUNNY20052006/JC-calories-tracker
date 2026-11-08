@@ -2,7 +2,7 @@
   "expo": {
     "name": "JC",
     "slug": "JC",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -12,6 +12,7 @@
       "bundleIdentifier": "com.jc.app"
     },
     "android": {
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -28,7 +29,9 @@
       "expo-router",
       "expo-sqlite",
       "expo-font",
-      "expo-system-ui"
+      "expo-secure-store",
+      "expo-system-ui",
+      "expo-status-bar"
     ],
     "androidStatusBar": {
       "translucent": true

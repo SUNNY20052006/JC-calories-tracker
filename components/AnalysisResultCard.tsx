@@ -1,20 +1,29 @@
 import { View, StyleSheet, Animated, Easing } from 'react-native';
-import { Text, TextInput } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useRef } from 'react';
-import { FoodAnalysisResult, FoodItem } from '../types';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { FoodAnalysisResult, FoodItem, MealNutrition, NutritionTargets } from '../types';
 import { RAW_COOKED_RATIOS } from '../constants/foodDatabase';
 import FoodItemCard from './FoodItemCard';
-import { TEXT_PRIMARY, TEXT_SECONDARY, COLOR_BORDER, BG_SURFACE, MACRO_CALORIES, MACRO_PROTEIN, MACRO_CARBS, MACRO_FAT } from '../constants/colors';
-import { RADIUS_SM, RADIUS_XL } from '../constants/radius';
+import MealAnalysisNotice from './MealAnalysisNotice';
+import MealMacroFields from './MealMacroFields';
+import type { TextMealAnalysis } from '../services/TextMealAnalysisService';
+import { TEXT_PRIMARY } from '../constants/colors';
+import { RADIUS_XL } from '../constants/radius';
 import { TITLE, HEADING } from '../constants/typography';
+import type { TargetDraft, TargetField } from '../utils/nutritionTargets';
 
 interface Props {
-  result: FoodAnalysisResult;
-  onEditTotal: (field: string, value: number) => void;
+  result: FoodAnalysisResult | null;
+  total: MealNutrition;
+  draft: TargetDraft | null;
+  targets: NutritionTargets | null;
+  onEditTotal: (field: TargetField, value: string) => void;
   onEditItem?: (index: number, item: FoodItem) => void;
-  onFocusInput?: () => void;
-  usedLocalFallback?: boolean;
+  source?: TextMealAnalysis['source'];
+  onRefresh: () => void;
+  refreshDisabled: boolean;
+  children?: ReactNode;
 }
 
 function findRatioKey(name: string): string | null {
@@ -25,7 +34,7 @@ function findRatioKey(name: string): string | null {
   return null;
 }
 
-export default function AnalysisResultCard({ result, onEditTotal, onEditItem, onFocusInput, usedLocalFallback }: Props) {
+export default function AnalysisResultCard({ result, total, draft, targets, onEditTotal, onEditItem, source, onRefresh, refreshDisabled, children }: Props) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(12)).current;
   const hasAnimated = useRef(false);
@@ -50,10 +59,8 @@ export default function AnalysisResultCard({ result, onEditTotal, onEditItem, on
     }
   }, []);
 
-  if (!result || !result.foodItems || result.foodItems.length === 0) return null;
-
   function handleToggleRaw(index: number) {
-    if (!onEditItem) return;
+    if (!onEditItem || !result) return;
     const item = { ...result.foodItems[index] };
     const key = findRatioKey(item.name);
     if (!key) return;
@@ -83,21 +90,15 @@ export default function AnalysisResultCard({ result, onEditTotal, onEditItem, on
           <Animated.View style={[styles.content, { opacity, transform: [{ translateY }] }]}>
             <Text style={styles.sectionTitle}>Analysis Result</Text>
 
-            {usedLocalFallback && (
-              <Text style={styles.fallbackBanner}>⚠ Estimated locally · AI unavailable</Text>
-            )}
+            {source && <MealAnalysisNotice source={source} onRefresh={onRefresh} disabled={refreshDisabled} />}
+            <MealMacroFields original={total} draft={draft} targets={targets} onChange={onEditTotal}
+              disabled={refreshDisabled} />
 
-            <View style={styles.macroRow}>
-              <MacroEdit label="Calories" value={result.calories} onChange={(v) => onEditTotal('calories', v)} color={MACRO_CALORIES} onFocus={onFocusInput} />
-              <MacroEdit label="Protein" value={result.protein} onChange={(v) => onEditTotal('protein', v)} color={MACRO_PROTEIN} onFocus={onFocusInput} />
-              <MacroEdit label="Carbs" value={result.carbs} onChange={(v) => onEditTotal('carbs', v)} color={MACRO_CARBS} onFocus={onFocusInput} />
-              <MacroEdit label="Fat" value={result.fat} onChange={(v) => onEditTotal('fat', v)} color={MACRO_FAT} onFocus={onFocusInput} />
-            </View>
-
-            <View style={styles.divider} />
-
-            <Text style={styles.itemsTitle}>Food Items</Text>
-            {result.foodItems.map((item, index) => (
+            {!!result?.foodItems.length && <>
+              <View style={styles.divider} />
+              <Text style={styles.itemsTitle}>Food Items</Text>
+            </>}
+            {result?.foodItems.map((item, index) => (
               <FoodItemCard
                 key={index}
                 item={item}
@@ -105,27 +106,10 @@ export default function AnalysisResultCard({ result, onEditTotal, onEditItem, on
                 translucent
               />
             ))}
+            {children}
           </Animated.View>
         </View>
       </View>
-    </View>
-  );
-}
-
-function MacroEdit({ label, value, onChange, color, onFocus }: { label: string; value: number; onChange: (v: number) => void; color: string; onFocus?: () => void }) {
-  return (
-    <View style={styles.macroEdit}>
-      <Text style={[styles.macroEditLabel, { color }]}>{label}</Text>
-      <TextInput
-        mode="outlined"
-        value={String(Math.round(value))}
-        onChangeText={(v) => onChange(Number(v) || 0)}
-        onFocus={onFocus}
-        keyboardType="numeric"
-        style={styles.macroEditInput}
-        outlineStyle={styles.macroEditOutline}
-        activeOutlineColor="#0A84FF"
-      />
     </View>
   );
 }
@@ -191,37 +175,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     ...TITLE,
     color: TEXT_PRIMARY,
-  },
-  fallbackBanner: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: TEXT_SECONDARY,
-    fontFamily: 'StackSansNotch_400Regular',
-  },
-  macroRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  macroEdit: {
-    flex: 1,
-  },
-  macroEditLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginBottom: 4,
-    textAlign: 'center',
-    fontFamily: 'StackSansNotch_500Medium',
-  },
-  macroEditInput: {
-    height: 40,
-    fontSize: 15,
-    backgroundColor: BG_SURFACE,
-    color: TEXT_PRIMARY,
-    textAlign: 'center',
-  },
-  macroEditOutline: {
-    borderRadius: RADIUS_SM,
-    borderColor: COLOR_BORDER,
   },
   divider: {
     height: 1,

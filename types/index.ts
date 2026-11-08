@@ -1,12 +1,19 @@
-export interface UserSettings {
-  id: number;
+export interface NutritionTargets {
   dailyCalories: number;
   proteinTarget: number;
   carbTarget: number;
   fatTarget: number;
+}
+
+export interface UserSettings extends NutritionTargets {
+  id: number;
+  displayName: string | null;
+  signedOut: number;
   createdAt: string;
   updatedAt: string;
 }
+
+export type SavedProfile = Pick<UserSettings, 'id' | 'displayName'>;
 
 export interface FoodLog {
   id: number;
@@ -31,12 +38,32 @@ export interface FoodItem {
   isRaw?: boolean;
 }
 
-export interface FoodAnalysisResult {
-  foodItems: FoodItem[];
+export interface MealNutrition {
   calories: number;
   protein: number;
   carbs: number;
   fat: number;
+}
+
+export interface FoodAnalysisResult extends MealNutrition {
+  foodItems: FoodItem[];
+}
+
+export interface Recipe {
+  id: number;
+  name: string;
+  description: string;
+  servings: number;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  createdAt: string;
+}
+
+export interface RecipeSelection {
+  recipe: Recipe;
+  servings: number;
 }
 
 export interface LocalFoodEntry {

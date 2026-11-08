@@ -7,9 +7,10 @@ import { RADIUS_XL } from '../constants/radius';
 interface Props {
   value: string;
   onChangeText: (text: string) => void;
+  disabled?: boolean;
 }
 
-export default function FoodEntry({ value, onChangeText }: Props) {
+export default function FoodEntry({ value, onChangeText, disabled = false }: Props) {
   return (
     <View style={styles.outContainer}>
       <View style={styles.depthShadow}>
@@ -25,6 +26,7 @@ export default function FoodEntry({ value, onChangeText }: Props) {
               placeholderTextColor={TEXT_DISABLED}
               value={value}
               onChangeText={onChangeText}
+              editable={!disabled}
               multiline
               numberOfLines={3}
               style={styles.input}
